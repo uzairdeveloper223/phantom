@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <AssemblyName>PHANTOM</AssemblyName>
+    <RootNamespace>PHANTOM</RootNamespace>
+    <DefineConstants>SHVDN3</DefineConstants>
+    <Version>0.1.0</Version>
+    <OutputPath>$(HOME)/GAMES/GTA-V/scripts/</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>9.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+
+    <Authors>Uzair Mughal</Authors>
+    <Company>Uzair Mughal</Company>
+    <Product>PHANTOM</Product>
+    <Description>Autonomous tactical NPC operator mod for GTA V. One call. One ghost. Zero witnesses.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/uzairdeveloper223/phantom</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/uzairdeveloper223/phantom.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <PackageReference Include="ScriptHookVDotNet3" Version="3.3.2">
+      <IncludeAssets>compile</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="LemonUI.SHVDN3" Version="1.5.1">
+      <IncludeAssets>compile</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

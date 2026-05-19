@@ -1,0 +1,38 @@
+# Build output
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.cache
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+.idea/
+
+# NuGet
+packages/
+*.nupkg
+nuget.config
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+
+# Dev / Internal
+task.md
+claude.md
+release-manager.sh
+resources/
+
+# Misc
+*.log
+*.tmp
+*.bak
