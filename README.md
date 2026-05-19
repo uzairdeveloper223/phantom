@@ -67,9 +67,6 @@ One call. One ghost. Zero witnesses.
 
 ## Screenshots
 
-> Screenshots will be added here. Place your screenshots in `assets/images/` and reference them below.
-
-<!--
 <p align="center">
   <img src="assets/images/screenshot_01.png" width="45%"/>
   <img src="assets/images/screenshot_02.png" width="45%"/>
@@ -78,8 +75,6 @@ One call. One ghost. Zero witnesses.
   <img src="assets/images/screenshot_03.png" width="45%"/>
   <img src="assets/images/screenshot_04.png" width="45%"/>
 </p>
--->
-
 ---
 
 ## Installation
