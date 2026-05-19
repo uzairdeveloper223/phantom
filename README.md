@@ -71,10 +71,6 @@ One call. One ghost. Zero witnesses.
   <img src="assets/images/screenshot_01.png" width="45%"/>
   <img src="assets/images/screenshot_02.png" width="45%"/>
 </p>
-<p align="center">
-  <img src="assets/images/screenshot_03.png" width="45%"/>
-  <img src="assets/images/screenshot_04.png" width="45%"/>
-</p>
 ---
 
 ## Installation
