@@ -31,7 +31,7 @@ task.md
 claude.md
 release-manager.sh
 resources/
-
+assets/videos
 # Misc
 *.log
 *.tmp
