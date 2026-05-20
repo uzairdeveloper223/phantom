@@ -82,8 +82,30 @@ One call. One ghost. Zero witnesses.
 ## Screenshots
 
 <p align="center">
-  <img src="assets/images/screenshot_01.png" width="45%"/>
-  <img src="assets/images/screenshot_02.png" width="45%"/>
+  <strong>PHANTOM Companion & Menu</strong><br/>
+  <img src="assets/images/phantom_player_and_menu.jpg" width="80%"/>
+</p>
+
+<p align="center">
+  <strong>Co-Op Vehicle Passenger Entry</strong><br/>
+  <img src="assets/images/phantom_and_player_in_car.jpg" width="80%"/>
+</p>
+
+<p align="center">
+  <strong>Combat Engagements</strong><br/>
+  <img src="assets/images/combat_engagement_ped.jpg" width="48%"/>
+  <img src="assets/images/combat_engagement_vehicle.jpg" width="48%"/>
+</p>
+
+<p align="center">
+  <strong>Convoy Backup & Support</strong><br/>
+  <img src="assets/images/backup_convoy.jpg" width="48%"/>
+  <img src="assets/images/buzzard_air_support.jpg" width="48%"/>
+</p>
+
+<p align="center">
+  <strong>Tactical Extraction Helicopter</strong><br/>
+  <img src="assets/images/extraction_helicopter.jpg" width="80%"/>
 </p>
 
 ---
