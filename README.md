@@ -98,7 +98,7 @@ One call. One ghost. Zero witnesses.
 | Script Hook V | Latest | [Download](http://www.dev-c.com/gtav/scripthookv/) |
 | Script Hook V .NET | 3.x | [Download](https://github.com/scripthookvdotnet/scripthookvdotnet/releases) |
 | .NET Framework | 4.8 | [Download](https://dotnet.microsoft.com/download/dotnet-framework/net48) |
-| LemonUI | 1.5+ | Bundled with SHVDN |
+| LemonUI | 1.5+ | [Download](https://github.com/LemonUIbyLemon/LemonUI) |
 
 ### Steps
 
