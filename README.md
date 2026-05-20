@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/uzairdeveloper223/phantom/releases/latest"><img src="https://img.shields.io/github/v/release/uzairdeveloper223/phantom?style=flat-square&color=00ff88&label=release" alt="Release"/></a>
+  <a href="https://www.gta5-mods.com/scripts/phantom-tactical-ai-companion"><img src="https://img.shields.io/badge/GTA5--Mods-PHANTOM-green?style=flat-square" alt="GTA5-Mods"/></a>
   <a href="https://github.com/uzairdeveloper223/phantom/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-00ff88?style=flat-square" alt="License"/></a>
   <img src="https://img.shields.io/badge/.NET_Framework-4.8-blue?style=flat-square" alt=".NET"/>
   <img src="https://img.shields.io/badge/SHVDN-3.3.2-blue?style=flat-square" alt="SHVDN"/>
@@ -206,6 +207,7 @@ src/
 
 | Resource | URL |
 |---|---|
+| GTA5-Mods Page | [gta5-mods.com](https://www.gta5-mods.com/scripts/phantom-tactical-ai-companion) |
 | Script Hook V | [dev-c.com/gtav/scripthookv](http://www.dev-c.com/gtav/scripthookv/) |
 | Script Hook V .NET | [github.com/scripthookvdotnet](https://github.com/scripthookvdotnet/scripthookvdotnet) |
 | GTA V Native DB | [nativedb.dotindustries.dev](https://nativedb.dotindustries.dev/natives) |
