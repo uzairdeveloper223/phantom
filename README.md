@@ -103,7 +103,7 @@ One call. One ghost. Zero witnesses.
 ### Steps
 
 1. Install **Script Hook V** and **Script Hook V .NET** into your GTA V root directory.
-2. Download the latest release from the Releases page.
+2. Download the latest build from the [latest release](https://github.com/uzairdeveloper223/phantom/releases/latest).
 3. Extract the archive. Copy `PHANTOM.dll` and `PHANTOM.ini` into your `GTA V/scripts/` folder.
 4. Launch GTA V.
 5. Press `F10` to open the PHANTOM menu.
