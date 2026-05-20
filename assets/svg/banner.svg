@@ -107,6 +107,6 @@
   <text x="600" y="316" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" fill="#00ff88" opacity="0.7">GTA V  |  SHVDN3</text>
 
   <!-- Side labels -->
-  <text x="50" y="370" font-family="'Courier New', monospace" font-size="10" fill="#444444">SYS::PHANTOM_v0.1.0</text>
+  <text x="50" y="370" font-family="'Courier New', monospace" font-size="10" fill="#444444">SYS::PHANTOM_v0.2.0</text>
   <text x="1150" y="370" text-anchor="end" font-family="'Courier New', monospace" font-size="10" fill="#444444">NET48 // x64</text>
 </svg>

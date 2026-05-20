@@ -7,7 +7,7 @@
     <AssemblyName>PHANTOM</AssemblyName>
     <RootNamespace>PHANTOM</RootNamespace>
     <DefineConstants>SHVDN3</DefineConstants>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <OutputPath>$(HOME)/GAMES/GTA-V/scripts/</OutputPath>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>9.0</LangVersion>

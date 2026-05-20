@@ -42,6 +42,9 @@ namespace PHANTOM
         private readonly NativeItem deployBackupItem;
         private readonly NativeItem cancelBackupItem;
 
+        private readonly NativeItem distFromPlayerItem;
+        private readonly NativeItem distFromPhantomItem;
+
         public event Action OnSummon;
         public event Action OnDismiss;
         public event Action OnFollow;
@@ -177,6 +180,15 @@ namespace PHANTOM
             mainMenu.Add(callBackupItem);
             mainMenu.Add(airSupportItem);
             mainMenu.Add(dismissBackupItem);
+
+            distFromPlayerItem = new NativeItem(
+                "PHANTOM Range: --", "Distance from player."
+            );
+            distFromPhantomItem = new NativeItem(
+                "Target Range: --", "Distance from PHANTOM to target."
+            );
+            distFromPlayerItem.Enabled = false;
+            distFromPhantomItem.Enabled = false;
 
             kamikazeMenu = new NativeMenu(
                 "PHANTOM", "ATTACK OPTIONS",
@@ -343,7 +355,7 @@ namespace PHANTOM
             airSupportMenu.Visible = false;
         }
 
-        public void UpdateItemStates(bool isPhantomActive)
+        public void UpdateItemStates(bool isPhantomActive, bool isKamikazeActive, float distFromPlayer, float distFromPhantom)
         {
             summonItem.Enabled = !isPhantomActive;
             dismissItem.Enabled = isPhantomActive;
@@ -359,6 +371,49 @@ namespace PHANTOM
             callBackupItem.Enabled = isPhantomActive;
             dismissBackupItem.Enabled = isPhantomActive;
             airSupportItem.Enabled = isPhantomActive;
+
+            if (isKamikazeActive)
+            {
+                kamikazeItem.Title = "Abort Kamikaze";
+                kamikazeItem.Description = "Cancel the active Kamikaze attack and rejoin group.";
+            }
+            else
+            {
+                kamikazeItem.Title = "Kamikaze";
+                kamikazeItem.Description = "Mark target, choose attack.";
+            }
+
+            if (isPhantomActive && distFromPlayer >= 0f)
+            {
+                if (!mainMenu.Items.Contains(distFromPlayerItem))
+                {
+                    mainMenu.Add(distFromPlayerItem);
+                }
+                distFromPlayerItem.Title = $"PHANTOM Range: {distFromPlayer:F1}m";
+            }
+            else
+            {
+                if (mainMenu.Items.Contains(distFromPlayerItem))
+                {
+                    mainMenu.Remove(distFromPlayerItem);
+                }
+            }
+
+            if (isPhantomActive && isKamikazeActive && distFromPhantom >= 0f)
+            {
+                if (!mainMenu.Items.Contains(distFromPhantomItem))
+                {
+                    mainMenu.Add(distFromPhantomItem);
+                }
+                distFromPhantomItem.Title = $"Target Range: {distFromPhantom:F1}m";
+            }
+            else
+            {
+                if (mainMenu.Items.Contains(distFromPhantomItem))
+                {
+                    mainMenu.Remove(distFromPhantomItem);
+                }
+            }
         }
     }
 }

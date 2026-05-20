@@ -18,7 +18,7 @@
 
 ## About
 
-**PHANTOM** is a Script Hook V .NET mod that deploys an autonomous AI companion into GTA V. The companion operates as a fully independent tactical unit: following the player, engaging hostiles, hijacking vehicles on command, calling in backup squads, coordinating extraction helicopters, and synchronizing parachute drops.
+PHANTOM is a Script Hook V .NET mod that deploys an autonomous AI companion into GTA V. The companion operates as a fully independent tactical unit: following the player, engaging hostiles, hijacking vehicles on command, calling in backup squads, coordinating extraction helicopters, and synchronizing parachute drops.
 
 One call. One ghost. Zero witnesses.
 
@@ -27,41 +27,55 @@ One call. One ghost. Zero witnesses.
 ## Features
 
 ### Core Companion
-- Persistent AI companion with configurable ped model and loadout
-- Follow / Wait / Dismiss command system
-- Automatic combat engagement with configurable weapon set
-- Health regeneration system
-- Drive-by shooting from vehicles
+- Persistent AI companion with configurable ped model and loadout.
+- Follow, Wait, and Dismiss command system with realistic radio animations.
+- Intelligent passenger entry: if the player gets into any vehicle, PHANTOM automatically scans for empty seats and boards the vehicle as a passenger to ride shotgun.
+- Health regeneration system that kicks in after a delay when out of combat.
+- Drive-by shooting capabilities when riding in passenger seats.
+- Dynamic LemonUI menu displaying read-only metrics in real-time, including distance from player to PHANTOM and distance from PHANTOM to the active target.
 
 ### Vehicle Operations
-- **Hijack** -- PHANTOM steals the nearest vehicle and delivers it to the player
-- **Cruise** -- Autonomous patrol driving
-- **Drive To** -- Navigate to a specified destination
-- Player boards hijacked vehicles with `F` key proximity prompt
+- **Hijack**: PHANTOM steals the nearest vehicle and delivers it to the player.
+- **Cruise**: Autonomous patrol driving.
+- **Drive To**: Navigate directly to a specified map destination.
+- Board hijacked vehicles instantly with a proximity prompt.
 
-### Backup Deployment
-- Ground backup: foot squads and vehicle convoys (up to 4 units)
-- Air support: Buzzard attack helicopters with armed gunners
-- Backup vehicles ignore traffic rules for aggressive pursuit
-- Auto-backup when player health is critical
+### Tactical Aiming HUD & Lock-On System
+- **Tactical Aiming HUD**: Enter targeting mode, aim at any ped or vehicle, and press the T key to lock on.
+- **Real-Time Stats Board**: A tactical overlay in the top-right displays the target's Class (Infantry or Vehicle), Vehicle Model Name, Occupant Count (via real-time seat scanning), Distance in meters, and Health percentage.
+- **Holographic 3D Chevron**: Draws a floating red or blue thick chevron in 3D space above the target's head, which tracks them in real time as they move.
+- **Snappy Menu Transition**: Locking a target triggers an audio cue, marks the target as mission-critical to prevent despawning, and automatically opens the Kamikaze attack menu.
+- **Gunfight Avoidance**: Friendly backup units and PHANTOM automatically ignore the active target in general combat targeting, ensuring they are not gunned down before the Kamikaze attack can strike.
+
+### Advanced Kamikaze Operations
+- **Attack Modes**: Choose between Suicide Bomb, Ram & Explode, and Execute modes.
+- **Bumper-to-Bumper Collision Detonation**: Upgraded suicide bomb and ram-explode attacks check for native physical bumper contact and a realistic vehicle-center radius (7.0m for suicide, 7.5m for ramming speed) to detonate the explosion instantly upon physical touch.
+- **Foot-Based Kamikaze Bypass**: If the target vehicle is within 40 meters and has no driver or the driver is dead, PHANTOM bypasses finding a vehicle and sprints directly to the target on foot to detonate the explosion on contact.
+- **Vehicle Retention**: If PHANTOM is already sitting inside a vehicle when the attack is ordered, they immediately use that car to execute the charge. For safety, if they are in your vehicle, they will exit it first.
+- **Dynamic Abort & Retrieval**: Cancel the Kamikaze attack at any time. If PHANTOM is far (> 45 meters) when aborted, they hijack a vehicle and drive back to you. They pull up and get out if you are on foot, or stay inside to escort if you are in a vehicle.
+
+### Premium Backup Ground Chase & Escort Engine
+- Ground backup convoys follow you with an advanced, aggressive chase and steering system.
+- **Dynamic Power Rubberbanding**: Convoys dynamically scale engine torque up to a 5.0x power multiplier when lagging behind to keep pace with high-speed supercars.
+- **Convoy Signals**: Backup vehicles flash high beams and sound their horn periodically to clear ambient civilian traffic when lagging behind.
+- **Anti-Stutter AI**: Escort commands are throttled to 5.0 seconds, giving the driving AI uninterrupted time to calculate smooth steering and paths instead of continuously resetting or braking.
+- **Out-of-Sight Spawning**: The teleport fallback is increased to 150 meters and queries roadway nodes to spawn vehicles organically behind the player, out of your direct line of sight.
+
+### Backup Deployment & Air Support
+- Spawns ground squads and vehicle convoys up to 4 units.
+- Air support: Buzzard attack helicopters with armed black ops gunners.
+- Automatic backup dispatching when player health drops to critical levels.
 
 ### Extraction System
-- **Flare-based landing** -- Throw a flare to mark your landing zone
-- Annihilator extraction helicopter circles overhead until LZ is marked
-- Heli lands precisely on the flare position
-- Press `F` to board when within range
-- **Drop at waypoint** -- Set a map waypoint and fly there with distance tracking
-- Pilot is invincible with max driving ability
-
-### Tactical Operations
-- **Airstrike** -- Mark a ground target for aerial bombardment
-- **Kamikaze** -- Suicide, Ram, and Execute attack modes
-- **Chase** -- Lock onto and pursue a target vehicle
+- Spawns an Annihilator extraction helicopter that circles overhead.
+- Mark your landing zone by throwing a flare. The helicopter lands precisely on the flare.
+- Board the helicopter as a passenger with a proximity prompt.
+- **Drop at Waypoint**: Set a map waypoint and the helicopter flies you there with distance tracking.
 
 ### Parachute Sync
-- PHANTOM auto-deploys parachute when the player does
-- Position synchronized 4m to the right during descent
-- Smooth lerped movement for cinematic freefall
+- PHANTOM auto-deploys a parachute when the player does.
+- Descent position is synchronized 4 meters to the right.
+- Smooth lerped movement ensures a cinematic freefall.
 
 ---
 
@@ -72,6 +86,7 @@ One call. One ghost. Zero witnesses.
   <img src="assets/images/screenshot_02.png" width="45%"/>
 </p>
 
+---
 
 ## Installation
 
@@ -88,7 +103,7 @@ One call. One ghost. Zero witnesses.
 ### Steps
 
 1. Install **Script Hook V** and **Script Hook V .NET** into your GTA V root directory.
-2. Download the latest release from the [Releases](https://github.com/uzairdeveloper223/phantom/releases) page.
+2. Download the latest release from the Releases page.
 3. Extract the archive. Copy `PHANTOM.dll` and `PHANTOM.ini` into your `GTA V/scripts/` folder.
 4. Launch GTA V.
 5. Press `F10` to open the PHANTOM menu.
@@ -127,13 +142,11 @@ HealthRegenInterval=3000
 HealthRegenDelay=5000
 ```
 
-Refer to the [GTA V Native Reference](https://nativedb.dotindustries.dev/natives) for valid model and weapon hash names.
-
 ---
 
 ## Building from Source
 
-> Most users do not need to build from source. Pre-built releases are available as zip archives on the [Releases](https://github.com/uzairdeveloper223/phantom/releases) tab. Download, extract, and copy the contents to your `scripts/` folder.
+Most users do not need to build from source. Pre-built releases are available as zip archives on the Releases tab.
 
 ### Requirements
 
@@ -149,13 +162,7 @@ dotnet restore
 dotnet build
 ```
 
-The output DLL is written to the path configured in `PHANTOM.csproj` (`OutputPath`). For development, this points to your local GTA V scripts folder.
-
-### Release Build
-
-```bash
-dotnet build -c Release
-```
+The output DLL is written to the path configured in `PHANTOM.csproj`.
 
 ---
 
@@ -170,15 +177,6 @@ src/
   PhantomMenu.cs      LemonUI menu system and user input
   PhantomState.cs     State enum (Following, Combat, Hijack, etc.)
 ```
-
-| Component | Responsibility |
-|---|---|
-| `PhantomMain` | Central state machine. Routes each tick to the correct handler based on `PhantomState`. |
-| `PhantomPed` | Spawns, configures, and manages the companion ped lifecycle. Handles group membership. |
-| `PhantomTasks` | Encapsulates AI task logic: hijacking, vehicle search, combat targeting, radio animations. |
-| `PhantomBackup` | Manages backup squads (ground/air), extraction heli spawning, pilot AI, and cleanup. |
-| `PhantomMenu` | Builds the NativeUI menu tree and dispatches user selections to handlers. |
-| `PhantomState` | Defines all possible companion states for the state machine. |
 
 ---
 
@@ -196,20 +194,14 @@ src/
 
 ## Known Bugs
 
-The following issues are present in the current release and may be addressed in future updates:
-
-- Airstrike explosion occurs but does not cause damage or produce a visible explosion effect
-- No radio call animation plays when calling for air support or airstrike
-- Kamikaze suicide explosion does not work properly
-- Kamikaze modes (Ram, Execute) are not functioning correctly
-- PHANTOM walks in circles when idle with no active command
-- Additional bugs may exist and will be cataloged as they are discovered
+- Unusual behavior of the backup convoy
+- Other bugs can be reported on GitHub
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License.
 
 ---
 

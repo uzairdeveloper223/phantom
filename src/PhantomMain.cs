@@ -34,10 +34,16 @@ namespace PHANTOM
         private const int AIRSTRIKE_EXPLOSION_INTERVAL = 400;
         private const int AIRSTRIKE_EXPLOSION_COUNT = 10;
         private const int AIRSTRIKE_INITIAL_DELAY = 5000;
+        private const float CHASE_ESCAPE_DISTANCE = 450f;
+        private const float CHASE_BOARDING_RANGE = 12f;
 
         private PhantomState currentState = PhantomState.Inactive;
-        private Entity kamikazeTarget;
+        public static Entity kamikazeTarget;
+        private Entity activeAimTarget = null;
+        private int lastReturnDriveTime = 0;
         private Vehicle chaseTarget;
+        private Vehicle chaseVehicle;
+        private bool hasChaseStarted;
         private GTA.Math.Vector3 airstrikePosition;
         private Vehicle airstrikeJet1;
         private Vehicle airstrikeJet2;
@@ -115,9 +121,44 @@ namespace PHANTOM
         private void OnTick(object sender, EventArgs e)
         {
             phantomMenu.Process();
-            phantomMenu.UpdateItemStates(phantomPed.IsActive);
+
+            Ped player = Game.Player.Character;
+            Ped phantom = phantomPed.Ped;
+
+            bool isKamikazeActive = currentState == PhantomState.KamikazeSuicide
+                || currentState == PhantomState.KamikazeRam
+                || currentState == PhantomState.KamikazeExecute
+                || currentState == PhantomState.KamikazeTargeting;
+
+
+            float distFromPlayer = -1f;
+            float distFromPhantom = -1f;
+            if (player != null && player.Exists() && phantomPed.IsActive)
+            {
+                if (phantom != null && phantom.Exists())
+                {
+                    distFromPlayer = player.Position.DistanceTo(phantom.Position);
+                    if (kamikazeTarget != null && kamikazeTarget.Exists())
+                    {
+                        distFromPhantom = phantom.Position.DistanceTo(kamikazeTarget.Position);
+                    }
+                }
+            }
+
+            phantomMenu.UpdateItemStates(phantomPed.IsActive, isKamikazeActive, distFromPlayer, distFromPhantom);
 
             phantomPed.CleanupDeadBlip();
+
+
+            if (currentState == PhantomState.KamikazeSuicide ||
+                currentState == PhantomState.KamikazeRam ||
+                currentState == PhantomState.KamikazeExecute)
+            {
+                if (kamikazeTarget != null && kamikazeTarget.Exists())
+                {
+                    DrawTacticalHUD(kamikazeTarget, true);
+                }
+            }
 
             if (!phantomPed.IsActive)
             {
@@ -128,9 +169,6 @@ namespace PHANTOM
                 }
                 return;
             }
-
-            Ped phantom = phantomPed.Ped;
-            Ped player = Game.Player.Character;
 
             switch (currentState)
             {
@@ -150,10 +188,10 @@ namespace PHANTOM
                     TickKamikazeTargeting(player);
                     break;
                 case PhantomState.KamikazeSuicide:
-                    TickKamikazeSuicide(phantom);
+                    TickKamikazeSuicide(phantom, player);
                     break;
                 case PhantomState.KamikazeRam:
-                    TickKamikazeRam(phantom);
+                    TickKamikazeRam(phantom, player);
                     break;
                 case PhantomState.KamikazeExecute:
                     TickKamikazeExecute(phantom);
@@ -184,16 +222,148 @@ namespace PHANTOM
                     break;
             }
 
-            TickBackup(player);
+            TickBackup(phantom, player);
             TickAutoBackup(phantom, player);
             TickParachuteSync(phantom, player);
+            phantomBackup.TickBackupParachutes(player);
             UpdateHealthRegeneration();
         }
 
         private void TickFollowing(Ped phantom)
         {
+            Ped player = Game.Player.Character;
+            if (phantom == null || !phantom.Exists() || player == null || !player.Exists())
+                return;
+
+            if (UpdateFollowingReturn(phantom, player))
+            {
+                return;
+            }
+
+            if (phantom.IsSittingInVehicle())
+            {
+                Vehicle vehicle = phantom.CurrentVehicle;
+                if (vehicle != null && vehicle.Exists()
+                    && player.IsInVehicle(vehicle))
+                {
+                    if (phantom.SeatIndex == VehicleSeat.Driver)
+                    {
+                        Function.Call(Hash.SET_VEHICLE_HANDBRAKE, vehicle.Handle, true);
+                        Function.Call(Hash.SET_VEHICLE_FORWARD_SPEED, vehicle.Handle, 0f);
+                        phantom.Task.ClearAll();
+                        return;
+                    }
+                }
+            }
+
             if (!phantom.IsInGroup)
                 phantomPed.RejoinGroup();
+        }
+
+        private bool UpdateFollowingReturn(Ped phantom, Ped player)
+        {
+            float dist = phantom.Position.DistanceTo(player.Position);
+
+
+            if (player.IsInVehicle() && !phantom.IsInVehicle())
+            {
+                Vehicle playerVeh = player.CurrentVehicle;
+                if (playerVeh != null && playerVeh.Exists())
+                {
+                    if (!phantom.IsGettingIntoVehicle)
+                    {
+                        VehicleSeat freeSeat = PhantomTasks.FindFreeSeat(playerVeh);
+                        if (freeSeat != VehicleSeat.None)
+                        {
+                            phantomPed.LeaveGroupSafe();
+                            phantom.Task.EnterVehicle(
+                                playerVeh,
+                                freeSeat,
+                                -1,
+                                2.0f,
+                                EnterVehicleFlags.None
+                            );
+                        }
+                    }
+                    return true;
+                }
+            }
+
+
+            if (phantom.IsSittingInVehicle())
+            {
+                Vehicle vehicle = phantom.CurrentVehicle;
+                if (vehicle != null && vehicle.Exists())
+                {
+                    if (dist > 15f)
+                    {
+
+                        phantomPed.LeaveGroupSafe();
+
+
+                        if (Game.GameTime > lastReturnDriveTime + 2000)
+                        {
+                            lastReturnDriveTime = Game.GameTime;
+
+
+                            Function.Call(Hash.SET_VEHICLE_HANDBRAKE, vehicle.Handle, false);
+
+
+                            phantom.Task.DriveTo(
+                                vehicle,
+                                player.Position,
+                                10f,
+                                40f,
+                                DrivingStyle.AvoidTrafficExtremely
+                            );
+                        }
+                        return true;
+                    }
+                    else
+                    {
+
+
+                        if (!player.IsInVehicle())
+                        {
+                            phantom.Task.LeaveVehicle(vehicle, LeaveVehicleFlags.None);
+                            phantomPed.RejoinGroup();
+                            return true;
+                        }
+                        else
+                        {
+
+                            phantomPed.RejoinGroup();
+                        }
+                    }
+                }
+            }
+
+
+            if (phantom.IsGettingIntoVehicle)
+            {
+                phantomPed.LeaveGroupSafe();
+                return true;
+            }
+
+
+            if (dist > 45f && !phantom.IsSittingInVehicle())
+            {
+                Vehicle returnVehicle = phantomTasks.GetNearestReturnVehicle(phantom, player);
+                if (returnVehicle != null && returnVehicle.Exists())
+                {
+                    phantomPed.LeaveGroupSafe();
+                    phantom.Task.EnterVehicle(
+                        returnVehicle,
+                        VehicleSeat.Driver,
+                        10000,
+                        3.0f,
+                        EnterVehicleFlags.None
+                    );
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void TickCombat(Ped phantom, Ped player)
@@ -225,11 +395,17 @@ namespace PHANTOM
                 return;
             }
 
-            phantomTasks.TickDriveTo(phantom, player);
-
             Blip waypoint = PhantomTasks.GetWaypointBlip();
             if (waypoint == null)
+            {
+                StopDrivingAndFollow(phantom);
+                GTA.UI.Notification.Show(
+                    "~y~PHANTOM: No waypoint. Holding."
+                );
                 return;
+            }
+
+            phantomTasks.TickDriveTo(phantom, player);
 
             float dist = phantom.Position.DistanceTo(
                 waypoint.Position
@@ -243,6 +419,26 @@ namespace PHANTOM
                 phantomPed.RejoinGroup();
                 TransitionTo(PhantomState.Following);
             }
+        }
+
+        private void StopDrivingAndFollow(Ped phantom)
+        {
+            if (phantom == null || !phantom.Exists())
+                return;
+
+            Vehicle vehicle = phantom.CurrentVehicle;
+            phantom.Task.ClearAll();
+            if (vehicle != null && vehicle.Exists())
+            {
+                Function.Call(
+                    Hash.SET_VEHICLE_FORWARD_SPEED,
+                    vehicle.Handle,
+                    0f
+                );
+            }
+
+            phantomPed.RejoinGroup();
+            TransitionTo(PhantomState.Following);
         }
 
         private void TickVehicleHijack(Ped phantom, Ped player)
@@ -283,6 +479,18 @@ namespace PHANTOM
                 }
             }
 
+            if (!phantom.IsSittingInVehicle()
+                && !phantom.IsGettingIntoVehicle
+                && Game.GameTime > tickCooldown + 15000)
+            {
+                GTA.UI.Notification.Show(
+                    "~o~PHANTOM: Lost it. Heading back."
+                );
+                phantomPed.RejoinGroup();
+                TransitionTo(PhantomState.Following);
+                return;
+            }
+
             if (Game.GameTime < tickCooldown)
                 return;
             tickCooldown = Game.GameTime + HIJACK_TICK_INTERVAL;
@@ -292,55 +500,141 @@ namespace PHANTOM
 
         private void TickKamikazeTargeting(Ped player)
         {
-            if (!player.IsShooting)
-                return;
-
-            Entity marked = FindDamagedEntity(player);
-            if (marked == null)
-                return;
-
-            if (marked is Ped mp && !mp.IsAlive)
+            if (kamikazeTarget != null && kamikazeTarget.Exists())
             {
-                GTA.UI.Notification.Show(
-                    "~g~PHANTOM: Target down."
-                );
-                phantomPed.RejoinGroup();
-                TransitionTo(PhantomState.Following);
+
+                DrawTacticalHUD(kamikazeTarget, true);
                 return;
             }
 
-            if (marked is Vehicle mv && mv.IsDead)
+
+            if (player.IsAiming)
             {
-                GTA.UI.Notification.Show(
-                    "~g~PHANTOM: Target destroyed."
-                );
-                phantomPed.RejoinGroup();
-                TransitionTo(PhantomState.Following);
-                return;
+                activeAimTarget = FindAimTarget(player);
+                if (activeAimTarget != null && activeAimTarget.Exists())
+                {
+
+                    DrawTacticalHUD(activeAimTarget, false);
+
+
+                    if (Game.IsKeyPressed(Keys.T))
+                    {
+
+                        Function.Call(Hash.PLAY_SOUND_FRONTEND, -1, "SELECT", "HUD_FRONTEND_DEFAULT_SOUNDSET", true);
+
+
+                        kamikazeTarget = activeAimTarget;
+                        Function.Call(Hash.SET_ENTITY_AS_MISSION_ENTITY, kamikazeTarget.Handle, true, true);
+                        if (kamikazeTarget is Ped targetPed && targetPed.IsInVehicle())
+                        {
+                            Vehicle targetVeh = targetPed.CurrentVehicle;
+                            if (targetVeh != null && targetVeh.Exists())
+                            {
+                                Function.Call(Hash.SET_ENTITY_AS_MISSION_ENTITY, targetVeh.Handle, true, true);
+                            }
+                        }
+
+
+                        Blip targetBlip = kamikazeTarget.AttachedBlip;
+                        if (targetBlip == null || !targetBlip.Exists())
+                        {
+                            targetBlip = kamikazeTarget.AddBlip();
+                            targetBlip.Color = BlipColor.Red;
+                            targetBlip.Name = "PHANTOM TARGET";
+                            targetBlip.Scale = 0.75f;
+                        }
+
+                        GTA.UI.Notification.Show("~r~PHANTOM: Target locked! Pick attack.");
+
+
+                        phantomMenu.ShowKamikazeOptions(
+                            kamikazeTarget is Vehicle || (kamikazeTarget is Ped tp && tp.IsInVehicle())
+                        );
+                    }
+                }
+                else
+                {
+
+                    DrawScanningIndicator("SCANNING FOR TARGET...");
+                }
             }
-
-            kamikazeTarget = marked;
-
-            Blip targetBlip = marked.AttachedBlip;
-            if (targetBlip == null || !targetBlip.Exists())
+            else
             {
-                targetBlip = marked.AddBlip();
-                targetBlip.Color = BlipColor.Red;
-                targetBlip.Name = "PHANTOM TARGET";
-                targetBlip.Scale = 0.7f;
+
+                DrawScanningIndicator("HOLD AIM (RCLICK) & AIM AT TARGET");
             }
-
-            GTA.UI.Notification.Show(
-                "~r~PHANTOM: Target marked. Choose attack."
-            );
-
-            phantomMenu.ShowKamikazeOptions(
-                marked is Vehicle
-            );
         }
 
         private Entity FindDamagedEntity(Ped player)
         {
+
+            Entity aimed = Game.Player.TargetedEntity;
+            if (aimed != null && aimed.Exists())
+            {
+                if (aimed is Ped ped && ped.IsAlive && ped != player && ped != phantomPed.Ped)
+                {
+                    if (ped.IsInVehicle())
+                    {
+                        Vehicle v = ped.CurrentVehicle;
+                        if (v != null && v.Exists() && !v.IsDead)
+                        {
+                            return ped;
+                        }
+                    }
+                    return ped;
+                }
+                if (aimed is Vehicle veh && !veh.IsDead)
+                {
+                    for (int seatIndex = -1; seatIndex < veh.PassengerCapacity; seatIndex++)
+                    {
+                        Ped occupant = veh.GetPedOnSeat((VehicleSeat)seatIndex);
+                        if (occupant != null && occupant.Exists() && occupant.IsAlive && occupant != player && occupant != phantomPed.Ped)
+                        {
+                            return occupant;
+                        }
+                    }
+                    return veh;
+                }
+            }
+
+
+            RaycastResult ray = World.Raycast(
+                GameplayCamera.Position,
+                GameplayCamera.Direction,
+                150f,
+                IntersectFlags.Everything,
+                player
+            );
+            if (ray.DidHit && ray.HitEntity != null && ray.HitEntity.Exists())
+            {
+                Entity hit = ray.HitEntity;
+                if (hit is Ped ped && ped.IsAlive && ped != player && ped != phantomPed.Ped)
+                {
+                    if (ped.IsInVehicle())
+                    {
+                        Vehicle v = ped.CurrentVehicle;
+                        if (v != null && v.Exists() && !v.IsDead)
+                        {
+                            return ped;
+                        }
+                    }
+                    return ped;
+                }
+                if (hit is Vehicle veh && !veh.IsDead)
+                {
+                    for (int seatIndex = -1; seatIndex < veh.PassengerCapacity; seatIndex++)
+                    {
+                        Ped occupant = veh.GetPedOnSeat((VehicleSeat)seatIndex);
+                        if (occupant != null && occupant.Exists() && occupant.IsAlive && occupant != player && occupant != phantomPed.Ped)
+                        {
+                            return occupant;
+                        }
+                    }
+                    return veh;
+                }
+            }
+
+
             Ped[] nearbyPeds = World.GetNearbyPeds(
                 player.Position, 100f
             );
@@ -348,7 +642,7 @@ namespace PHANTOM
             for (int i = 0; i < nearbyPeds.Length; i++)
             {
                 Ped ped = nearbyPeds[i];
-                if (ped == null || !ped.Exists())
+                if (ped == null || !ped.Exists() || !ped.IsAlive)
                     continue;
                 if (ped == player || ped == phantomPed.Ped)
                     continue;
@@ -363,37 +657,53 @@ namespace PHANTOM
             for (int i = 0; i < nearbyVehicles.Length; i++)
             {
                 Vehicle v = nearbyVehicles[i];
-                if (v == null || !v.Exists())
+                if (v == null || !v.Exists() || v.IsDead)
                     continue;
                 if (v.HasBeenDamagedBy(player))
+                {
+
+                    for (int seatIndex = -1; seatIndex < v.PassengerCapacity; seatIndex++)
+                    {
+                        Ped occupant = v.GetPedOnSeat((VehicleSeat)seatIndex);
+                        if (occupant != null && occupant.Exists() && occupant.IsAlive && occupant != player && occupant != phantomPed.Ped)
+                        {
+                            return occupant;
+                        }
+                    }
+
                     return v;
+                }
             }
 
             return null;
         }
 
-        private void TickKamikazeSuicide(Ped phantom)
+        private void TickKamikazeSuicide(Ped phantom, Ped player)
         {
             if (Game.GameTime < tickCooldown)
                 return;
             tickCooldown = Game.GameTime + KAMIKAZE_TICK_INTERVAL;
 
             if (phantomTasks.TickSuicideBomb(
-                phantom, kamikazeTarget))
+                phantom, player, kamikazeTarget))
             {
                 CleanupKamikazeTarget();
                 TransitionTo(PhantomState.Inactive);
             }
         }
 
-        private void TickKamikazeRam(Ped phantom)
+        private void TickKamikazeRam(Ped phantom, Ped player)
         {
             if (Game.GameTime < tickCooldown)
                 return;
             tickCooldown = Game.GameTime + KAMIKAZE_TICK_INTERVAL;
 
+            phantomTasks.CommandKamikazePassengerPrompt(
+                phantom, player
+            );
+
             if (phantomTasks.TickRamExplode(
-                phantom, kamikazeTarget))
+                phantom, player, kamikazeTarget))
             {
                 CleanupKamikazeTarget();
                 phantomPed.RejoinGroup();
@@ -407,6 +717,10 @@ namespace PHANTOM
                 return;
             tickCooldown = Game.GameTime + EXECUTE_TICK_INTERVAL;
 
+            phantomTasks.CommandKamikazePassengerPrompt(
+                phantom, Game.Player.Character
+            );
+
             if (phantomTasks.TickExecuteTarget(
                 phantom, kamikazeTarget))
             {
@@ -416,14 +730,14 @@ namespace PHANTOM
             }
         }
 
-        private void TickBackup(Ped player)
+        private void TickBackup(Ped phantom, Ped player)
         {
             if (Game.GameTime < backupTickCooldown)
                 return;
             backupTickCooldown =
                 Game.GameTime + BACKUP_TICK_INTERVAL;
 
-            phantomBackup.Tick(player);
+            phantomBackup.Tick(player, phantom);
         }
 
         private void TickAutoBackup(Ped phantom, Ped player)
@@ -503,12 +817,21 @@ namespace PHANTOM
 
         private void CleanupKamikazeTarget()
         {
-            if (kamikazeTarget != null
-                && kamikazeTarget.Exists())
+            if (kamikazeTarget != null && kamikazeTarget.Exists())
             {
                 Blip b = kamikazeTarget.AttachedBlip;
                 if (b != null && b.Exists())
                     b.Delete();
+
+                kamikazeTarget.MarkAsNoLongerNeeded();
+                if (kamikazeTarget is Ped targetPed && targetPed.IsInVehicle())
+                {
+                    Vehicle targetVeh = targetPed.CurrentVehicle;
+                    if (targetVeh != null && targetVeh.Exists())
+                    {
+                        targetVeh.MarkAsNoLongerNeeded();
+                    }
+                }
             }
             kamikazeTarget = null;
         }
@@ -597,6 +920,9 @@ namespace PHANTOM
             if (!phantomPed.IsActive)
                 return;
 
+            GTA.UI.Notification.Show(
+                "~o~PHANTOM: Copy. Going dark."
+            );
             CleanupKamikazeTarget();
             phantomBackup.DismissAll();
             phantomPed.Dismiss();
@@ -608,6 +934,9 @@ namespace PHANTOM
             if (!phantomPed.IsActive)
                 return;
 
+            GTA.UI.Notification.Show(
+                "~o~PHANTOM: Right behind you."
+            );
             phantomPed.Ped.Task.ClearAll();
             phantomPed.RejoinGroup();
             TransitionTo(PhantomState.Following);
@@ -618,6 +947,9 @@ namespace PHANTOM
             if (!phantomPed.IsActive)
                 return;
 
+            GTA.UI.Notification.Show(
+                "~o~PHANTOM: Holding position."
+            );
             phantomPed.LeaveGroupSafe();
             phantomTasks.ExecuteWait(phantomPed.Ped);
             TransitionTo(PhantomState.Waiting);
@@ -628,6 +960,9 @@ namespace PHANTOM
             if (!phantomPed.IsActive)
                 return;
 
+            GTA.UI.Notification.Show(
+                "~o~PHANTOM: Weapons free."
+            );
             phantomPed.RejoinGroup();
             phantomPed.Ped.BlockPermanentEvents = false;
             phantomTasks.ExecuteCombat(phantomPed.Ped);
@@ -640,12 +975,31 @@ namespace PHANTOM
             if (!phantomPed.IsActive)
                 return;
 
-            phantomPed.LeaveGroupSafe();
-            phantomTasks.ExecuteVehicleHijack(
-                phantomPed.Ped, Game.Player.Character
-            );
-            tickCooldown = Game.GameTime + HIJACK_INITIAL_DELAY;
-            TransitionTo(PhantomState.VehicleHijack);
+            Ped player = Game.Player.Character;
+            Ped phantom = phantomPed.Ped;
+
+            if (phantomTasks.HasNearbyVehicle(
+                phantom, player))
+            {
+                phantomPed.LeaveGroupSafe();
+                phantomTasks.ExecuteVehicleHijack(
+                    phantom, player
+                );
+                GTA.UI.Notification.Show(
+                    "~o~PHANTOM: On it. Getting you a ride."
+                );
+                tickCooldown =
+                    Game.GameTime + HIJACK_INITIAL_DELAY;
+                TransitionTo(PhantomState.VehicleHijack);
+            }
+            else
+            {
+                GTA.UI.Notification.Show(
+                    "~o~PHANTOM: Nothing to grab around here."
+                );
+                phantomPed.RejoinGroup();
+                TransitionTo(PhantomState.Following);
+            }
         }
 
         private void HandleDriveTo()
@@ -663,6 +1017,14 @@ namespace PHANTOM
                 return;
             }
 
+            if (PhantomTasks.GetWaypointBlip() == null)
+            {
+                GTA.UI.Notification.Show(
+                    "~o~PHANTOM: Set a waypoint first."
+                );
+                return;
+            }
+
             phantomPed.LeaveGroupSafe();
             phantomTasks.ExecuteDriveTo(
                 phantomPed.Ped, player
@@ -675,6 +1037,29 @@ namespace PHANTOM
         {
             if (!phantomPed.IsActive)
                 return;
+
+            if (currentState == PhantomState.KamikazeSuicide
+                || currentState == PhantomState.KamikazeRam
+                || currentState == PhantomState.KamikazeExecute
+                || currentState == PhantomState.KamikazeTargeting)
+            {
+                HandleCancelTargeting();
+                return;
+            }
+
+            if (currentState == PhantomState.ChaseActive
+                && chaseTarget != null
+                && chaseTarget.Exists()
+                && !chaseTarget.IsDead)
+            {
+                kamikazeTarget = chaseTarget;
+                phantomMenu.HideAll();
+                phantomMenu.ShowKamikazeOptions(true);
+                GTA.UI.Notification.Show(
+                    "~r~PHANTOM: Choose chase attack."
+                );
+                return;
+            }
 
             kamikazeTarget = null;
             phantomMenu.HideAll();
@@ -696,6 +1081,12 @@ namespace PHANTOM
             phantomTasks.ExecuteSuicideBomb(
                 phantomPed.Ped, kamikazeTarget
             );
+            CommandBackupAttack(
+                shouldExplode: true,
+                useRamMission: true,
+                useAllUnits: false
+            );
+            ClearChaseStateOnly();
             tickCooldown = Game.GameTime + KAMIKAZE_TICK_INTERVAL;
             TransitionTo(PhantomState.KamikazeSuicide);
         }
@@ -712,6 +1103,12 @@ namespace PHANTOM
                 Game.Player.Character,
                 kamikazeTarget
             );
+            CommandBackupAttack(
+                shouldExplode: false,
+                useRamMission: true,
+                useAllUnits: true
+            );
+            ClearChaseStateOnly();
             tickCooldown = Game.GameTime + KAMIKAZE_TICK_INTERVAL;
             TransitionTo(PhantomState.KamikazeRam);
         }
@@ -724,10 +1121,53 @@ namespace PHANTOM
 
             phantomPed.LeaveGroupSafe();
             phantomTasks.ExecuteExecuteTarget(
-                phantomPed.Ped, kamikazeTarget
+                phantomPed.Ped,
+                Game.Player.Character,
+                kamikazeTarget
             );
+            CommandBackupAttack(
+                shouldExplode: false,
+                useRamMission: false,
+                useAllUnits: true
+            );
+            ClearChaseStateOnly();
             tickCooldown = Game.GameTime + EXECUTE_TICK_INTERVAL;
             TransitionTo(PhantomState.KamikazeExecute);
+        }
+
+        private void CommandBackupAttack(
+            bool shouldExplode, bool useRamMission,
+            bool useAllUnits)
+        {
+            Vehicle vehicle = null;
+            if (kamikazeTarget is Vehicle v)
+            {
+                vehicle = v;
+            }
+            else if (kamikazeTarget is Ped p && p.IsInVehicle())
+            {
+                vehicle = p.CurrentVehicle;
+            }
+
+            if (vehicle == null)
+                return;
+
+            phantomBackup.AssistChaseTarget(
+                vehicle,
+                shouldExplode,
+                useRamMission,
+                useAllUnits
+            );
+        }
+
+        private void ClearChaseStateOnly()
+        {
+            if (kamikazeTarget != chaseTarget)
+                return;
+
+            chaseTarget = null;
+            chaseVehicle = null;
+            hasChaseStarted = false;
         }
 
         private void HandleDeployBackup(
@@ -825,18 +1265,23 @@ namespace PHANTOM
                 if (v.HasBeenDamagedBy(player))
                 {
                     chaseTarget = v;
+                    chaseVehicle = null;
+                    hasChaseStarted = false;
                     Blip b = v.AddBlip();
                     b.Color = BlipColor.Red;
                     b.Name = "CHASE TARGET";
                     b.Scale = 0.8f;
 
                     phantomPed.LeaveGroupSafe();
-                    phantomTasks.ExecuteChase(
-                        phantomPed.Ped, v
+                    phantomTasks.PrepareChaseVehicle(
+                        phantomPed.Ped, player, v
                     );
                     tickCooldown =
                         Game.GameTime + CHASE_TICK_INTERVAL;
                     TransitionTo(PhantomState.ChaseActive);
+                    GTA.UI.Notification.Show(
+                        "~o~PHANTOM: Boarding chase vehicle."
+                    );
                     return;
                 }
             }
@@ -847,6 +1292,8 @@ namespace PHANTOM
             if (Game.GameTime < tickCooldown)
                 return;
             tickCooldown = Game.GameTime + CHASE_TICK_INTERVAL;
+
+            Ped player = Game.Player.Character;
 
             if (chaseTarget == null
                 || !chaseTarget.Exists()
@@ -861,6 +1308,35 @@ namespace PHANTOM
                 return;
             }
 
+            if (!hasChaseStarted && HasChaseTargetEscaped(player))
+            {
+                GTA.UI.Notification.Show(
+                    "~y~PHANTOM: Chase target escaped."
+                );
+                CleanupChaseTarget();
+                phantomPed.RejoinGroup();
+                TransitionTo(PhantomState.Following);
+                return;
+            }
+
+            if (!hasChaseStarted)
+            {
+                TickChaseBoarding(phantom, player);
+                return;
+            }
+
+            if (chaseVehicle == null
+                || !chaseVehicle.Exists()
+                || !player.IsInVehicle(chaseVehicle))
+            {
+                GTA.UI.Notification.Show(
+                    "~y~PHANTOM: Waiting for player in chase car."
+                );
+                return;
+            }
+
+            phantomBackup.SupportChase(chaseTarget, player);
+
             if (phantomTasks.TickChase(phantom, chaseTarget))
             {
                 CleanupChaseTarget();
@@ -869,11 +1345,91 @@ namespace PHANTOM
             }
         }
 
+        private void TickChaseBoarding(Ped phantom, Ped player)
+        {
+            if (!phantom.IsSittingInVehicle())
+            {
+                phantomTasks.PrepareChaseVehicle(
+                    phantom, player, chaseTarget
+                );
+                GTA.UI.Screen.ShowSubtitle(
+                    "PHANTOM is acquiring a chase vehicle",
+                    100
+                );
+                return;
+            }
+
+            chaseVehicle = phantom.CurrentVehicle;
+            if (chaseVehicle == null || !chaseVehicle.Exists())
+                return;
+
+            PhantomTasks.UnlockVehicleForPlayer(chaseVehicle);
+
+            if (!player.IsInVehicle(chaseVehicle))
+            {
+                float dist = player.Position.DistanceTo(
+                    chaseVehicle.Position
+                );
+                if (dist <= CHASE_BOARDING_RANGE)
+                {
+                    GTA.UI.Screen.ShowSubtitle(
+                        "Press ~b~F~w~ to start chase",
+                        100
+                    );
+
+                    if (Game.IsControlPressed(GTA.Control.Enter))
+                    {
+                        VehicleSeat seat =
+                            PhantomTasks.FindFreeSeat(chaseVehicle);
+                        if (seat != VehicleSeat.None)
+                            player.SetIntoVehicle(chaseVehicle, seat);
+                    }
+                }
+                return;
+            }
+
+            hasChaseStarted = true;
+            phantomBackup.SupportChase(chaseTarget, player);
+            phantomTasks.TickChase(phantom, chaseTarget);
+            GTA.UI.Notification.Show(
+                "~r~PHANTOM: Chase engaged."
+            );
+        }
+
+        private bool HasChaseTargetEscaped(Ped player)
+        {
+            if (chaseTarget == null || !chaseTarget.Exists())
+                return true;
+
+            float playerDist = chaseTarget.Position.DistanceTo(
+                player.Position
+            );
+            if (playerDist <= CHASE_ESCAPE_DISTANCE)
+                return false;
+
+            if (!phantomPed.IsActive)
+                return true;
+
+            float phantomDist = chaseTarget.Position.DistanceTo(
+                phantomPed.Ped.Position
+            );
+            return phantomDist > CHASE_ESCAPE_DISTANCE;
+        }
+
         private void TickCruiseState(Ped phantom, Ped player)
         {
             if (Game.GameTime < tickCooldown)
                 return;
             tickCooldown = Game.GameTime + CRUISE_TICK_INTERVAL;
+
+            if (PhantomTasks.GetWaypointBlip() == null)
+            {
+                StopDrivingAndFollow(phantom);
+                GTA.UI.Notification.Show(
+                    "~y~PHANTOM: No waypoint. Holding."
+                );
+                return;
+            }
 
             if (phantomTasks.TickCruise(phantom, player))
             {
@@ -938,6 +1494,14 @@ namespace PHANTOM
                 return;
             }
 
+            if (PhantomTasks.GetWaypointBlip() == null)
+            {
+                GTA.UI.Notification.Show(
+                    "~o~PHANTOM: Set a waypoint first."
+                );
+                return;
+            }
+
             phantomPed.LeaveGroupSafe();
             phantomTasks.ExecuteCruise(
                 phantomPed.Ped, player
@@ -960,6 +1524,22 @@ namespace PHANTOM
                 return;
             }
 
+            Ped player = Game.Player.Character;
+            Ped phantom = phantomPed.Ped;
+            float distToPlayer = waypoint.Position
+                .DistanceTo(player.Position);
+            float distToPhantom = waypoint.Position
+                .DistanceTo(phantom.Position);
+
+            if (distToPlayer < 30f || distToPhantom < 30f)
+            {
+                GTA.UI.Notification.Show(
+                    "~r~PHANTOM: That's way too close. "
+                    + "Move the marker further out."
+                );
+                return;
+            }
+
             phantomTasks.PlayRadioCallAnimation(
                 phantomPed.Ped
             );
@@ -975,7 +1555,7 @@ namespace PHANTOM
             );
 
             GTA.UI.Notification.Show(
-                "~r~AIRSTRIKE: Jets inbound! Take cover!"
+                "~r~PHANTOM: Airstrike inbound. Get clear."
             );
             TransitionTo(PhantomState.AirstrikeActive);
         }
@@ -1008,6 +1588,8 @@ namespace PHANTOM
                     b.Delete();
             }
             chaseTarget = null;
+            chaseVehicle = null;
+            hasChaseStarted = false;
         }
 
         private unsafe void CleanupAirstrike()
@@ -1262,6 +1844,7 @@ namespace PHANTOM
 
             if (playerIn && phantomIn)
             {
+                phantomBackup.BoardBackupForExtraction(player);
                 phantomBackup.FlyExtractionRandom();
                 GTA.UI.Notification.Show(
                     "~g~EXTRACTION: All aboard! Flying out."
@@ -1296,6 +1879,16 @@ namespace PHANTOM
 
             if (!player.IsInVehicle(heli))
             {
+                if (IsPlayerDropping(player))
+                {
+                    CommandPhantomAirdrop(phantom, player);
+                    phantomBackup.CommandBackupAirdrop(player);
+                    phantomBackup.ReleaseExtractionAircraft();
+                    phantomPed.RejoinGroup();
+                    TransitionTo(PhantomState.Following);
+                    return;
+                }
+
                 GTA.UI.Notification.Show(
                     "~y~EXTRACTION: You left the heli."
                 );
@@ -1309,6 +1902,10 @@ namespace PHANTOM
                 return;
             tickCooldown = Game.GameTime + 20000;
 
+            phantomBackup.BoardBackupForExtraction(player);
+            phantomBackup.FlyBackupExtractionFollowers(
+                heli.Position
+            );
             phantomBackup.FlyExtractionRandom();
         }
 
@@ -1337,6 +1934,16 @@ namespace PHANTOM
 
             if (!player.IsInVehicle(heli))
             {
+                if (IsPlayerDropping(player))
+                {
+                    CommandPhantomAirdrop(phantom, player);
+                    phantomBackup.CommandBackupAirdrop(player);
+                    phantomBackup.ReleaseExtractionAircraft();
+                    phantomPed.RejoinGroup();
+                    TransitionTo(PhantomState.Following);
+                    return;
+                }
+
                 GTA.UI.Notification.Show(
                     "~y~EXTRACTION: You left the heli."
                 );
@@ -1356,6 +1963,11 @@ namespace PHANTOM
                 100
             );
 
+            if (dist2D < 150f)
+            {
+                phantomBackup.LandExtractionAtPosition(waypointDropDest);
+            }
+
             if (dist2D < 60f && heli.HeightAboveGround < 6f
                 && heli.Speed < 3f)
             {
@@ -1374,9 +1986,51 @@ namespace PHANTOM
                 return;
             tickCooldown = Game.GameTime + 8000;
 
+            phantomBackup.BoardBackupForExtraction(player);
+            phantomBackup.FlyBackupExtractionFollowers(
+                waypointDropDest
+            );
             phantomBackup.FlyExtractionToWaypoint(
                 waypointDropDest
             );
+        }
+
+        private static bool IsPlayerDropping(Ped player)
+        {
+            return player != null
+                && player.Exists()
+                && player.IsInAir
+                && player.HeightAboveGround > 12f;
+        }
+
+        private static void CommandPhantomAirdrop(
+            Ped phantom, Ped player)
+        {
+            if (phantom == null || !phantom.Exists()
+                || !phantom.IsAlive)
+                return;
+
+            if (!phantom.Weapons.HasWeapon(
+                WeaponHash.Parachute))
+            {
+                phantom.Weapons.Give(
+                    WeaponHash.Parachute, 1, false, true
+                );
+            }
+
+            if (phantom.IsInVehicle())
+            {
+                phantom.Task.LeaveVehicle(
+                    LeaveVehicleFlags.BailOut
+                );
+                return;
+            }
+
+            Vector3 dropPosition = player.Position
+                + player.RightVector * 4f;
+            dropPosition.Z += 2f;
+            phantom.Position = dropPosition;
+            phantom.Task.Skydive();
         }
 
         private void TickParachuteSync(
@@ -1423,20 +2077,17 @@ namespace PHANTOM
                 phantom.Handle
             );
 
-            if (playerState >= 1 && phantomState == 0)
+            if (phantomState < 0)
+                phantom.Task.Skydive();
+
+            if (playerState >= 1 && phantomState <= 0)
             {
-                Function.Call(
-                    Hash.TASK_PARACHUTE,
-                    phantom.Handle, true
-                );
+                phantom.Task.UseParachute();
             }
 
             if (playerState == 2 && phantomState < 2)
             {
-                Function.Call(
-                    Hash.FORCE_PED_TO_OPEN_PARACHUTE,
-                    phantom.Handle
-                );
+                phantom.OpenParachute();
             }
 
             if (playerState >= 1 && phantomState >= 1)
@@ -1459,6 +2110,186 @@ namespace PHANTOM
                     false, false, false, true
                 );
             }
+        }
+
+        private Entity FindAimTarget(Ped player)
+        {
+
+            Entity aimed = Game.Player.TargetedEntity;
+            if (aimed != null && aimed.Exists())
+            {
+                if (aimed is Ped ped && ped.IsAlive && ped != player && ped != phantomPed.Ped)
+                {
+                    return ped;
+                }
+                if (aimed is Vehicle veh && !veh.IsDead)
+                {
+                    return veh;
+                }
+            }
+
+
+            RaycastResult ray = World.Raycast(
+                GameplayCamera.Position,
+                GameplayCamera.Direction,
+                150f,
+                IntersectFlags.Everything,
+                player
+            );
+            if (ray.DidHit && ray.HitEntity != null && ray.HitEntity.Exists())
+            {
+                Entity hit = ray.HitEntity;
+                if (hit is Ped ped && ped.IsAlive && ped != player && ped != phantomPed.Ped)
+                {
+                    return ped;
+                }
+                if (hit is Vehicle veh && !veh.IsDead)
+                {
+                    return veh;
+                }
+            }
+            return null;
+        }
+
+        private void DrawTacticalHUD(Entity entity, bool locked)
+        {
+            if (entity == null || !entity.Exists())
+                return;
+
+
+            Ped player = Game.Player.Character;
+            float distance = player.Position.DistanceTo(entity.Position);
+
+
+            float screenX = GTA.UI.Screen.ScaledWidth - 320f;
+            float screenY = 150f;
+
+
+            string typeStr = entity is Ped ? "INFANTRY / PERSON" : "VEHICLE / TRANSPORT";
+            string nameStr = "N/A";
+            int occupantCount = 0;
+            float healthPct = (entity.Health / (float)entity.MaxHealth) * 100f;
+            if (healthPct < 0f) healthPct = 0f;
+
+            Vehicle targetVeh = null;
+            if (entity is Ped targetPed)
+            {
+                if (targetPed.IsInVehicle())
+                {
+                    targetVeh = targetPed.CurrentVehicle;
+                }
+            }
+            else if (entity is Vehicle v)
+            {
+                targetVeh = v;
+            }
+
+            if (targetVeh != null && targetVeh.Exists())
+            {
+                typeStr = "VEHICLE TARGET";
+                nameStr = targetVeh.LocalizedName;
+                if (string.IsNullOrEmpty(nameStr) || nameStr == "NULL")
+                {
+                    nameStr = targetVeh.Model.ToString();
+                }
+
+
+                for (int seat = -1; seat < targetVeh.PassengerCapacity; seat++)
+                {
+                    Ped occupant = targetVeh.GetPedOnSeat((VehicleSeat)seat);
+                    if (occupant != null && occupant.Exists() && occupant.IsAlive)
+                    {
+                        occupantCount++;
+                    }
+                }
+            }
+
+
+            System.Drawing.Color panelColor = locked ? System.Drawing.Color.FromArgb(180, 80, 0, 0) : System.Drawing.Color.FromArgb(180, 10, 20, 30);
+            System.Drawing.Color borderColor = locked ? System.Drawing.Color.FromArgb(255, 220, 20, 20) : System.Drawing.Color.FromArgb(255, 0, 180, 255);
+
+
+            DrawRect(screenX, screenY, 6f, 160f, borderColor);
+            DrawRect(screenX + 6f, screenY, 284f, 160f, panelColor);
+
+
+            string statusHeader = locked ? "SYSTEM: PHANTOM LOCKED" : "TARGET ACQUISITION ACTIVE";
+            DrawText(statusHeader, screenX + 15f, screenY + 10f, 0.32f, borderColor, true);
+
+            DrawText($"CLASS: {typeStr}", screenX + 15f, screenY + 35f, 0.28f, System.Drawing.Color.White);
+            if (targetVeh != null)
+            {
+                DrawText($"MODEL: {nameStr.ToUpper()}", screenX + 15f, screenY + 55f, 0.28f, System.Drawing.Color.White);
+                DrawText($"OCCUPANTS: {occupantCount}", screenX + 15f, screenY + 75f, 0.28f, System.Drawing.Color.White);
+            }
+            else
+            {
+                DrawText($"MODEL: ON FOOT", screenX + 15f, screenY + 55f, 0.28f, System.Drawing.Color.White);
+                DrawText($"OCCUPANTS: 1", screenX + 15f, screenY + 75f, 0.28f, System.Drawing.Color.White);
+            }
+
+            DrawText($"DISTANCE: {distance:F1}m", screenX + 15f, screenY + 95f, 0.28f, System.Drawing.Color.White);
+            DrawText($"HEALTH: {healthPct:F0}%", screenX + 15f, screenY + 115f, 0.28f, healthPct > 50f ? System.Drawing.Color.LightGreen : System.Drawing.Color.OrangeRed);
+
+            if (!locked)
+            {
+                DrawText("[T] KEY - PRESS TO LOCK ON TARGET", screenX + 15f, screenY + 138f, 0.26f, System.Drawing.Color.Yellow, true);
+            }
+            else
+            {
+                DrawText("PHANTOM PROTOCOL ENGAGED", screenX + 15f, screenY + 138f, 0.26f, System.Drawing.Color.Orange, true);
+            }
+
+
+            World.DrawMarker(
+                MarkerType.ThickChevronUp,
+                entity.Position + new Vector3(0, 0, 1.8f),
+                Vector3.Zero,
+                new Vector3(0f, 180f, 0f),
+                new Vector3(0.6f, 0.6f, 0.6f),
+                borderColor,
+                false,
+                false,
+                true
+            );
+        }
+
+        private void DrawRect(float x, float y, float width, float height, System.Drawing.Color color)
+        {
+            Function.Call(Hash.DRAW_RECT,
+                (x + width / 2f) / GTA.UI.Screen.ScaledWidth,
+                (y + height / 2f) / 720f,
+                width / GTA.UI.Screen.ScaledWidth,
+                height / 720f,
+                color.R, color.G, color.B, color.A
+            );
+        }
+
+        private void DrawText(string text, float x, float y, float scale, System.Drawing.Color color, bool bold = false)
+        {
+            var textElement = new GTA.UI.TextElement(
+                text,
+                new System.Drawing.PointF(x, y),
+                scale,
+                color,
+                GTA.UI.Font.ChaletLondon,
+                GTA.UI.Alignment.Left
+            );
+            textElement.Draw();
+        }
+
+        private void DrawScanningIndicator(string text)
+        {
+            float screenWidth = GTA.UI.Screen.ScaledWidth;
+            float panelWidth = 400f;
+            float panelHeight = 35f;
+            float panelX = (screenWidth - panelWidth) / 2f;
+            float panelY = 620f;
+
+            DrawRect(panelX, panelY, panelWidth, panelHeight, System.Drawing.Color.FromArgb(160, 10, 15, 20));
+            DrawRect(panelX, panelY, 4f, panelHeight, System.Drawing.Color.FromArgb(255, 0, 180, 255));
+
+            DrawText(text, panelX + 15f, panelY + 6f, 0.28f, System.Drawing.Color.FromArgb(255, 0, 180, 255), true);
         }
     }
 }
